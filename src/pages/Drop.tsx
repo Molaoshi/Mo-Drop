@@ -62,27 +62,37 @@ export default function Drop() {
     setSending(true);
     try {
       if (!jobIdRef.current) {
-        jobIdRef.current = await createJob.mutateAsync({
-          title: title.trim() || "Untitled job",
-          instructions: instructions.trim() || undefined,
-        });
+        jobIdRef.current = await Promise.race([
+          createJob.mutateAsync({
+            title: title.trim() || "Untitled job",
+            instructions: instructions.trim() || undefined,
+          }),
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error("job create timed out")), 30_000),
+          ),
+        ]);
       }
       const jobId = jobIdRef.current;
       for (const item of queue) {
         if (item.status === "done") continue;
         setItem(item.id, { status: "uploading" });
-        await uploadFile(item.file, {
-          jobId,
-          kind: "inbox",
-          onProgress: (sent) => setItem(item.id, { sent }),
-        });
+        try {
+          await uploadFile(item.file, {
+            jobId,
+            kind: "inbox",
+            onProgress: (sent) => setItem(item.id, { sent }),
+          });
+        } catch (err) {
+          setItem(item.id, { status: "error" });
+          throw err;
+        }
         setItem(item.id, { status: "done", sent: item.file.size });
       }
       toast.success("Footage received — Kimi can start.");
       utils.jobs.list.invalidate();
       navigate(`/jobs/${jobId}`);
     } catch {
-      toast.error("Upload interrupted — press send again, finished files are kept.");
+      toast.error("Upload stalled — connection problem. Press Send to Kimi again to resume; finished parts are kept.");
     } finally {
       setSending(false);
     }

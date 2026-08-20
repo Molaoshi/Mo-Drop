@@ -6,5 +6,5 @@ export const config = {
   appPassword: process.env.APP_PASSWORD || "mo-drop-2026",
   agentToken: process.env.AGENT_TOKEN || "dev-agent-token-change-me",
   uploadDir: process.env.UPLOAD_DIR || path.resolve(process.cwd(), "data", "uploads"),
-  chunkSize: 8 * 1024 * 1024, // 8 MB — fits under the 50 MB body limit, retries are cheap
+  chunkSize: 2 * 1024 * 1024, // 2 MB — progress shows sooner on flaky links, retries are cheap
 };

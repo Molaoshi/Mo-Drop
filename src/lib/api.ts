@@ -35,10 +35,21 @@ export interface UploadOptions {
   onProgress?: (bytesSent: number, total: number) => void;
 }
 
+// fetch with a hard timeout — a hung request on a flaky link must fail fast
+// so the retry/backoff logic (and the user-visible error) can kick in.
+function timedFetch(url: string, init: RequestInit, timeoutMs: number): Promise<Response> {
+  return fetch(url, { ...init, signal: AbortSignal.timeout(timeoutMs) });
+}
+
+const INIT_TIMEOUT = 20_000;
+const STATUS_TIMEOUT = 20_000;
+const CHUNK_TIMEOUT = 45_000;
+const COMPLETE_TIMEOUT = 30_000;
+
 // Chunked upload with per-chunk retry + server-side resume state.
 // Returns the new file id.
 export async function uploadFile(file: File, opts: UploadOptions = {}): Promise<number> {
-  const initRes = await fetch("/api/uploads/init", {
+  const initRes = await timedFetch("/api/uploads/init", {
     method: "POST",
     credentials: "include",
     headers: { "Content-Type": "application/json" },
@@ -49,7 +60,7 @@ export async function uploadFile(file: File, opts: UploadOptions = {}): Promise<
       kind: opts.kind ?? "inbox",
       jobId: opts.jobId,
     }),
-  });
+  }, INIT_TIMEOUT);
   if (!initRes.ok) throw new Error(`upload init failed (${initRes.status})`);
   const { uploadId, chunkSize } = (await initRes.json()) as {
     uploadId: string;
@@ -58,7 +69,7 @@ export async function uploadFile(file: File, opts: UploadOptions = {}): Promise<
 
   // Resume: ask the server how much it already holds
   let offset = 0;
-  const st = await fetch(`/api/uploads/${uploadId}/status`, { credentials: "include" });
+  const st = await timedFetch(`/api/uploads/${uploadId}/status`, { credentials: "include" }, STATUS_TIMEOUT);
   if (st.ok) {
     const j = await st.json();
     offset = Math.min(Number(j.received) || 0, file.size);
@@ -71,7 +82,7 @@ export async function uploadFile(file: File, opts: UploadOptions = {}): Promise<
     let sent = false;
     for (let attempt = 1; attempt <= 4 && !sent; attempt++) {
       try {
-        const r = await fetch(`/api/uploads/${uploadId}/chunk`, {
+        const r = await timedFetch(`/api/uploads/${uploadId}/chunk`, {
           method: "PUT",
           credentials: "include",
           headers: {
@@ -79,7 +90,7 @@ export async function uploadFile(file: File, opts: UploadOptions = {}): Promise<
             "Content-Type": "application/octet-stream",
           },
           body: blob,
-        });
+        }, CHUNK_TIMEOUT);
         if (!r.ok) throw new Error(`chunk failed (${r.status})`);
         sent = true;
       } catch (err) {
@@ -91,10 +102,10 @@ export async function uploadFile(file: File, opts: UploadOptions = {}): Promise<
     opts.onProgress?.(offset, file.size);
   }
 
-  const doneRes = await fetch(`/api/uploads/${uploadId}/complete`, {
+  const doneRes = await timedFetch(`/api/uploads/${uploadId}/complete`, {
     method: "POST",
     credentials: "include",
-  });
+  }, COMPLETE_TIMEOUT);
   if (!doneRes.ok) {
     const j = await doneRes.json().catch(() => null);
     throw new Error(j?.error || `upload finalize failed (${doneRes.status})`);
