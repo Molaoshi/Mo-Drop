@@ -64,7 +64,22 @@ export default function JobDetail() {
   }
 
   const inbox = job.files.filter((f) => f.kind === "inbox");
+  const broll = job.files.filter((f) => f.kind === "broll");
   const outbox = job.files.filter((f) => f.kind === "outbox");
+
+  const spec = job.spec as import("@contracts/types").JobSpec | null;
+  const specChips: string[] = spec
+    ? [
+        spec.preset,
+        spec.spokenLanguage,
+        `subs: ${spec.subtitles.join("+") || "none"}`,
+        `music: ${spec.music}`,
+        spec.titleCard.enabled ? "title card" : "no title card",
+        spec.aiBroll.enabled ? "AI b-roll" : "",
+        spec.stockBroll.enabled ? `pexels: ${spec.stockBroll.keywords || "yes"}` : "",
+        spec.endCard === "none" ? "no end card" : `end card: ${spec.endCard}`,
+      ].filter(Boolean)
+    : [];
 
   const send = () => {
     const body = draft.trim();
@@ -104,6 +119,26 @@ export default function JobDetail() {
         </div>
       </div>
 
+      {specChips.length > 0 && (
+        <section className="mb-8">
+          <p className="micro-label mb-3">Edit spec</p>
+          <div className="flex flex-wrap gap-2">
+            {specChips.map((chip) => (
+              <span
+                key={chip}
+                className="rounded-sm border border-white/15 bg-white/[0.04] px-2.5 py-1 font-mono text-[11px] text-white/70"
+              >
+                {chip}
+              </span>
+            ))}
+          </div>
+          {spec?.titleCard.enabled && spec.titleCard.hook && (
+            <p className="micro-label mt-3">Hook: “{spec.titleCard.hook}”</p>
+          )}
+          {spec?.titleBar && <p className="micro-label mt-2">Title bar: “{spec.titleBar}”</p>}
+        </section>
+      )}
+
       {job.instructions && (
         <section className="mb-8">
           <p className="micro-label mb-3">Instructions</p>
@@ -126,6 +161,17 @@ export default function JobDetail() {
           )}
         </div>
       </section>
+
+      {broll.length > 0 && (
+        <section className="mb-8">
+          <p className="micro-label mb-3">Your b-roll · {broll.length}</p>
+          <div className="flex flex-col gap-2">
+            {broll.map((f) => (
+              <FileRow key={f.id} f={f} />
+            ))}
+          </div>
+        </section>
+      )}
 
       <section className="mb-10">
         <p className="micro-label mb-3">Finished · {outbox.length}</p>

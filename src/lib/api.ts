@@ -31,7 +31,7 @@ export async function apiLogout(): Promise<void> {
 
 export interface UploadOptions {
   jobId?: number;
-  kind?: "inbox" | "outbox" | "brand";
+  kind?: "inbox" | "outbox" | "brand" | "broll";
   onProgress?: (bytesSent: number, total: number) => void;
 }
 

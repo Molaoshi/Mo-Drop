@@ -5,6 +5,7 @@ import {
   text,
   timestamp,
   bigint,
+  int,
   json,
   index,
 } from "drizzle-orm/mysql-core";
@@ -14,9 +15,22 @@ export const jobs = mysqlTable("jobs", {
   id: serial("id").primaryKey(),
   title: varchar("title", { length: 255 }).notNull(),
   instructions: text("instructions"),
+  // Structured job spec from the New Job form (preset, languages, music, cards, b-roll…)
+  spec: json("spec"),
   status: varchar("status", { length: 32 }).notNull().default("new"), // new | downloading | editing | done | failed | cancelled
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow().onUpdateNow(),
+});
+
+// Style presets for the job form. Rows (not code) so a future control center
+// can edit labels + agent instructions without a redeploy.
+export const presets = mysqlTable("presets", {
+  id: serial("id").primaryKey(),
+  key: varchar("key", { length: 64 }).notNull().unique(),
+  label: varchar("label", { length: 128 }).notNull(),
+  instructions: text("instructions").notNull(), // what Kimi should do for this preset
+  sort: int("sort").notNull().default(0),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
 export const files = mysqlTable(
@@ -83,6 +97,7 @@ export const uploads = mysqlTable("uploads", {
 });
 
 export type Job = typeof jobs.$inferSelect;
+export type Preset = typeof presets.$inferSelect;
 export type StoredFile = typeof files.$inferSelect;
 export type Message = typeof messages.$inferSelect;
 export type Secret = typeof secrets.$inferSelect;

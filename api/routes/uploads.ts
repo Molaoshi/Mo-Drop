@@ -27,7 +27,7 @@ uploadRoutes.post("/init", async (c) => {
   if (!filename || !Number.isFinite(size) || size <= 0) {
     return c.json({ error: "filename and positive size required" }, 400);
   }
-  const kind = ["inbox", "outbox", "brand"].includes(body?.kind) ? body.kind : "inbox";
+  const kind = ["inbox", "outbox", "brand", "broll"].includes(body?.kind) ? body.kind : "inbox";
   const jobId = Number.isFinite(Number(body?.jobId)) ? Number(body.jobId) : null;
 
   ensureDirs();

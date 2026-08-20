@@ -6,8 +6,10 @@ import {
   addMessage,
   setJobStatus,
   listSecretsFull,
+  upsertSecret,
   getBrand,
   listBrandFiles,
+  listPresets,
 } from "../queries/drop";
 
 // Token-only API used by Kimi from the editing sandbox.
@@ -49,10 +51,30 @@ agentRoutes.post("/jobs/:id/message", async (c) => {
   return c.json({ ok: true });
 });
 
+// Style presets — full agent instructions keyed by job spec.preset
+agentRoutes.get("/presets", async (c) => {
+  const rows = await listPresets();
+  return c.json({
+    presets: rows.map((p) => ({ key: p.key, label: p.label, instructions: p.instructions })),
+  });
+});
+
 // Full secret values — agent token only, this is the whole point of the vault
 agentRoutes.get("/secrets", async (c) => {
   const rows = await listSecretsFull();
   return c.json({ secrets: rows.map((r) => ({ name: r.name, value: r.value })) });
+});
+
+// Vault a key from the editing sandbox (e.g. a key Mo pasted in chat)
+agentRoutes.post("/secrets", async (c) => {
+  const body = await c.req.json().catch(() => null);
+  const name = typeof body?.name === "string" ? body.name.trim() : "";
+  const value = typeof body?.value === "string" ? body.value.trim() : "";
+  if (!name || !value || name.length > 128 || value.length > 4000) {
+    return c.json({ error: "name and value required" }, 400);
+  }
+  await upsertSecret(name, value);
+  return c.json({ ok: true });
 });
 
 // Brand kit: colors, notes, and asset files (download via /api/files/:id/download)

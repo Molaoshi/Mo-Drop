@@ -1,6 +1,7 @@
 import { desc, asc, eq, isNull } from "drizzle-orm";
 import { getDb } from "./connection";
-import { jobs, files, messages, secrets, brandSettings } from "@db/schema";
+import { jobs, files, messages, secrets, brandSettings, presets } from "@db/schema";
+import type { JobSpec } from "@contracts/types";
 
 // ---------- jobs ----------
 
@@ -31,7 +32,7 @@ export async function getJob(id: number) {
   return { ...job, files: jobFiles, messages: thread };
 }
 
-export async function createJob(data: { title: string; instructions?: string }) {
+export async function createJob(data: { title: string; instructions?: string; spec?: JobSpec }) {
   const [{ id }] = await getDb().insert(jobs).values(data).$returningId();
   return id;
 }
@@ -47,6 +48,12 @@ export async function deleteJob(id: number) {
   await db.delete(files).where(eq(files.jobId, id));
   await db.delete(jobs).where(eq(jobs.id, id));
   return jobFiles;
+}
+
+// ---------- style presets ----------
+
+export async function listPresets() {
+  return getDb().select().from(presets).orderBy(asc(presets.sort));
 }
 
 // ---------- messages ----------
